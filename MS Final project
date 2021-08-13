@@ -1,0 +1,283 @@
+#include<reg51.h> // Biblioteca do 8051 em C 
+
+
+sfr lcddata=0xA0; // Declaração dos dados do lcd para a porta P2 (0xA0 em hex) 
+sbit rd=P0^0; // Declaração de cada dispositivo em relação a que porta do 8051 estão ligados
+sbit wr=P0^1;       //
+sbit intr=P0^2;     //
+sbit rs=P0^5;       //
+sbit rw=P0^6;       //
+sbit en=P0^7;       //
+sbit g=P3^2;        //
+sbit h=P3^3;        //
+sbit switchTemp=P3^0;       //
+sbit led1=P0^3;           //
+sbit led2=P0^4;           //
+
+int m=0;    //Declaração de variáveis de acordo com seus tipos na memória volátil
+int a,b;        //
+int l=0;    //
+int i;      //
+int press='0';        //
+unsigned char u,y,r;        //
+unsigned int aux=0,febre=0;      //
+unsigned char adc(),get_value, conv;  //
+int tamanho(unsigned char t);     //
+unsigned char n[10]={0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39}; // Alocação de um vetor na memória volátil de acordo com o endereço em hex
+code unsigned char nome[]= "Local cheio"; // Alocação de uma string na memória não volátil
+code unsigned char nome2[]= "            "; //
+
+
+void convert_display(unsigned char);  // Função de conversão de dados
+
+void delay(int a){    // Função delay
+    // A função serve para deixar o programa em um tempo de espera não exato.
+   int i;   //
+for(i=0;i<a;i++);   //
+   for(i=0;i<a;i++);    //
+      for(i=0;i<a;i++);     //
+	 for(i=0;i<a;i++);      //
+}
+
+void delay2(unsigned char b)    // Função delay2
+{
+  unsigned char a;  //
+  for(b;b>0;b--)    //
+  {
+    for(a=500;a>0;a--);   //
+  }
+}
+
+
+void lcd_int();   // Funções utilizadas ao decorrer do código
+void command(unsigned char dost);   //
+void lcddisplaydata(unsigned int c);    //
+void show(unsigned char *s);    //
+void delay(int);    //
+void button1(void);   //
+void button2(void);   //
+
+
+void write(unsigned char t){   // Função que escreve uma palavra no lcd
+   
+rs = 1;            //
+P2 = t;           //
+en  = 1;          //
+delay(5);         //
+en  = 0;          //
+delay(5);         //
+}
+
+void main()     // Função principal
+{ 
+   //---------------------- SETUP ------------------------------------//
+    lcd_int();    // Inicialização do lcd de acordo com o datasheet
+    
+    P3=0xFF;        //
+    command(0x38);      //
+    command(0x0C);      //
+    P2= 0x00;     //
+
+    EA = 1;    // Habilita as interrupções
+    EX0 = 1; // Habilita interrupção externa 1 (p3.2)
+    EX1 = 1; // Habilita interrupção externa 2 (p3.3)
+    IT0 = 0; // Habilita o modo "falling edge" (ativa quando detecta queda dos valor de 1 para 0)
+    IT1 = 0;  //
+   
+    show("Temp : ");    // Escrita das palavras bases na tela do lcd
+    command(0xc0);    //   Comando para pular linha
+    show("Quantidade de pessoas:00");  //
+    led1=1;   // Ligar o led verde
+   
+   //---------------------- SETUP ------------------------------------//
+    while(1)    // Função loop
+        {
+	   if(switchTemp==0)    // Se o botão de medir a temperatura ser apertado, será impresso a temperatura no lcd
+	   {
+       aux = 1;
+	       get_value = adc()*1.973;     //
+	      u = ((get_value/10)%10)+48;   //
+	      y = (get_value%10)+48;    //
+	       command(0x87);     //
+	       lcddisplaydata(u);   //
+	       lcddisplaydata(y);   //
+	       lcddisplaydata(0xdf);    //
+	       lcddisplaydata('C');   //
+	  if(u == '3'){   // Se as temperaturas serem de 37° acima, o led vermelho será acesso e a entrada bloqueada
+     switch (y){      
+        case '7':     //
+        led1=0;     //
+        led2=1;     //
+	febre = 1;      //
+        break;    //
+        case '8':     //
+        led1= 0;      //
+        led2=1;     //
+	febre = 1;      //
+        break;      //
+        case '9':     //
+        led1 = 0;     //
+        led2=1;     //
+	      febre = 1 ;     //
+        break;      //
+      default:      //
+        led1=1;     //
+        led2=0;     //
+      febre = 0;      //
+        break;      //
+   }
+        }
+    if(u == '0' || u == '1' || u == '2'){   //
+      led1 = 1;   //
+      led2 = 0;   //
+       febre = 0;   //
+      break;    //
+    }
+        }
+   
+    
+	
+     }
+  }
+  
+
+void button1(void) interrupt 0  // Função do botão de entrada de pessaos com interrupção ativada
+{  
+     if(g==0)  // 
+    {
+      if(m==10)   //  Condição de se haver 10 pessoas (num máximo de ocupantes no local), imprimir "Local Cheio" no lcd
+      {
+	led1=0;  //
+	led2=1;  // ...e ligar o led vermelho de bloqueio
+	command(0xD6);
+        while(nome[l] != '\0'){  //
+        write(nome[l]);     //
+        l++;    //
+	delay2(50);   //
+	}
+	delay2(50);   //
+	l = 0;    //
+	delay2(50);   //
+	command(0xD6);    // Impressão no endereço D6, que está após os ":"
+	while(nome2[l] != '\0'){    //
+        write(nome2[l]);    //
+        l++;    //
+	delay2(50);   //
+	}
+	l = 0;    //
+	command(0xD6);    //
+        lcddisplaydata(n[1]);   //
+	command(0xD7);    //
+        lcddisplaydata(n[0]);   //
+      }
+    else  // Se o local não estiver cheio, imprime o número de pessoas que estão lá dentro
+      {
+         if(aux == 0 || febre == 1){
+	    delay(1);
+	    }
+	    else{
+	    aux = 0;
+	    led2=0;   //
+	    led1=1;   //
+        m=m+1;    //
+        a=m/10;   //
+      {
+      command(0xD6);    //
+      lcddisplaydata(n[a]);   //
+      }   
+    b=m%10;   //
+    {
+      command(0xD7);    //
+      lcddisplaydata(n[b]);   //
+    }
+    while(g==0);    //
+    }
+  }
+  }
+}
+
+void button2(void) interrupt 2    //  Função do botão de saída de pessoas com interrupção ativada
+  {
+   if(h==0)   //
+  {
+    	led2=0;   //
+	    led1=1;   //
+    if(m==0)    //  Condição de se haver 0 pessoas,imprimir "00" no lcd
+      {
+	      led2=0;   //
+	      led1=1;   //
+        command(0xD6);    //
+        lcddisplaydata(n[0]);   //
+	      command(0xD7);
+        lcddisplaydata(n[0]);   //
+	 }
+      else    // Se o local não estiver vazio, imprime o número de pessoas - 1 que estão lá dentro
+        {
+	      led2=0;   //
+	      led1=1;
+        m=m-1;    //
+        a=m/10;   //
+        {
+          command(0xD6);    //
+          lcddisplaydata(n[a]);   //
+        }
+        b=m%10;   //
+        {
+          command(0xD7);    //
+          lcddisplaydata(n[b]);   //
+        };
+        while(h==0);    //
+        }
+      }
+   }
+
+
+
+void lcd_int()      // Fução de inicialização do lcd
+{
+    command(0x38);    //  Comandos de acordo com o datasheet
+    command(0x0e);    //
+    command(0x06);    //
+    command(0x01);    //
+    command(0x80);    //
+}
+
+void command(unsigned char dost)    // Função de envio de comandos para as portas P2(lcddata) 
+{
+  lcddata=dost;   //
+  en=1;     //
+  rs=0;     //
+  rw=0;     //
+  delay(5);    //
+  en=0;    //
+}
+
+void lcddisplaydata(unsigned char n)    // Função que escreve um caractere no lcd
+{
+  lcddata=n;     //
+  en=1;     //
+  rs=1;     //
+  rw=0;     //
+  delay(50);      //
+  en=0;     //
+}
+void show(unsigned char *s)   //   Função que escreve uma string(Palavra) no lcd
+{
+    while(*s)    //
+        lcddisplaydata(*s++);     //
+}
+
+unsigned char adc()   // Função de conversão de dados analógico para digital
+{
+    wr=0;     //
+    rd=1;     //
+    wr=1;     //
+    while(intr==1);     //
+    rd=0;     //
+    conv=P1;      //
+    
+    return conv;    //
+}
+
+
+
